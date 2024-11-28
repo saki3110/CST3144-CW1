@@ -1,5 +1,5 @@
 const { MongoClient } = require('mongodb');
-const uri = 'mongodb://localhost:27017/bright_minds_hub';
+const uri = 'mongodb+srv://SAKINA:sakina@cluster0.ew8zt.mongodb.net';
 let db;
 
 async function connectDB() {
