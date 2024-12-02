@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lesson Booking System</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Notification Section -->
+        <div v-if="notificationMessage" class="notification" :class="notificationType">
+            {{ notificationMessage }}
+        </div>
+
+        <div>
+            <label for="search">Search:</label>
+            <input type="text" v-model="searchQuery" placeholder="Search by subject, location, or price">
+        </div>
+        <div>
+            <label for="sort">Sort By:</label>
+            <select v-model="sortAttribute" @change="sortLessons">
+                <option value="subject">Subject</option>
+                <option value="location">Location</option>
+                <option value="price">Price</option>
+                <option value="spaces">Availability</option>
+            </select>
+            <button @click="toggleSortOrder">{{ sortOrder }}</button>
+        </div>
+
+        <!-- Lessons List -->
+        <div v-for="lesson in filteredLessons" :key="lesson._id" class="lesson">
+            <div>
+                <h4>{{ lesson.subject }}</h4>
+                <p>Location: {{ lesson.location }}</p>
+                <p>Price: £{{ lesson.price }}</p>
+                <p>Spaces: {{ lesson.spaces }}</p>
+            </div>
+            <button :class="{ disabled: lesson.spaces === 0 }" 
+                    @click="addToCart(lesson)" 
+                    :disabled="lesson.spaces === 0">
+                Add to Cart
+            </button>
+        </div>
+
+        <!-- Shopping Cart -->
+        <div class="cart">
+            <button @click="toggleCart" :disabled="cart.length === 0">
+                {{ showCart ? "Hide Cart" : "View Cart" }}
+            </button>
+            <div v-if="showCart">
+                <h3>Shopping Cart</h3>
+                <ul>
+                    <li v-for="(item, index) in cart" :key="index">
+                        {{ item.subject }} ({{ item.quantity }} spaces) 
+                        <button @click="removeFromCart(index)">Remove</button>
+                    </li>
+                </ul>
+                <h4>Total Items: {{ totalItems }}</h4>
+
+                <!-- Checkout Form -->
+                <div>
+                    <label>
+                        Name: 
+                        <input type="text" v-model="name" placeholder="Enter your name" />
+                        <span class="error" v-if="nameError">{{ nameError }}</span>
+                    </label>
+                    <label>
+                        Phone: 
+                        <input type="text" v-model="phone" placeholder="Enter your phone number" />
+                        <span class="error" v-if="phoneError">{{ phoneError }}</span>
+                    </label>
+                    <button @click="checkout" :disabled="!isCheckoutValid">Checkout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: "#app",
+            data: {
+                lessons: [],
+                cart: JSON.parse(localStorage.getItem('cart')) || [],
+                showCart: false,
+                name: '',
+                phone: '',
+                sortAttribute: 'subject',
+                sortOrder: 'Ascending',
+                nameError: '',
+                phoneError: '',
+                searchQuery: '',
+                notificationMessage: '', // To show notification
+                notificationType: '', // 'success' or 'error'
+            },
+            computed: {
+                filteredLessons() {
+                    const query = this.searchQuery.toLowerCase();
+                    return this.lessons.filter(lesson => 
+                        lesson.subject.toLowerCase().includes(query) ||
+                        lesson.location.toLowerCase().includes(query) ||
+                        String(lesson.price).includes(query)
+                    );
+                },
+                totalItems() {
+                    return this.cart.reduce((sum, item) => sum + item.quantity, 0);
+                },
+                isCheckoutValid() {
+                    return !this.nameError && !this.phoneError && this.cart.length > 0;
+                },
+            },
+            methods: {
+                fetchLessons() {
+                    fetch('http://localhost:3000/lessons')
+                        .then(response => response.json())
+                        .then(data => this.lessons = data)
+                        .catch(error => console.error('Error fetching lessons:', error));
+                },
+                addToCart(lesson) {
+                    if (lesson.spaces > 0) {
+                        lesson.spaces--;
+                        const cartItem = this.cart.find(item => item._id === lesson._id);
+                        if (cartItem) {
+                            cartItem.quantity++;
+                        } else {
+                            this.cart.push({ ...lesson, quantity: 1 });
+                        }
+                        this.saveCart();
+                    }
+                },
+                removeFromCart(index) {
+                    const item = this.cart[index];
+                    const lesson = this.lessons.find(l => l._id === item._id);
+                    if (lesson) {
+                        lesson.spaces += item.quantity;
+                    }
+                    this.cart.splice(index, 1);
+                    this.saveCart();
+                },
+                toggleCart() {
+                    this.showCart = !this.showCart;
+                },
+                sortLessons() {
+                    const order = this.sortOrder === 'Ascending' ? 1 : -1;
+                    this.lessons.sort((a, b) => {
+                        if (a[this.sortAttribute] < b[this.sortAttribute]) return -1 * order;
+                        if (a[this.sortAttribute] > b[this.sortAttribute]) return 1 * order;
+                        return 0;
+                    });
+                },
+                toggleSortOrder() {
+                    this.sortOrder = this.sortOrder === 'Ascending' ? 'Descending' : 'Ascending';
+                    this.sortLessons();
+                },
+                checkout() {
+                    this.validateName();
+                    this.validatePhone();
+
+                    if (this.isCheckoutValid) {
+                        const order = {
+                            name: this.name,
+                            phone: this.phone,
+                            lessonIDs: this.cart.map(item => item._id),
+                            numberOfSpaces: this.totalItems,
+                        };
+
+                        fetch('http://localhost:3000/order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(order),
+                        })
+                            .then(response => {
+                                if (response.ok) {
+                                    this.showNotification('Order placed successfully!', 'success');
+                                    this.cart = [];
+                                    this.name = '';
+                                    this.phone = '';
+                                    this.saveCart();
+                                    this.fetchLessons(); // Refresh inventory
+                                } else {
+                                    this.showNotification('Failed to place order. Try again.', 'error');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error placing order:', error);
+                                this.showNotification('Failed to place order. Try again.', 'error');
+                            });
+                    } else {
+                        this.showNotification('Invalid name or phone number.', 'error');
+                    }
+                },
+                validateName() {
+                    if (!/^[a-zA-Z\s]+$/.test(this.name)) {
+                        this.nameError = 'Name must contain only letters and spaces.';
+                    } else {
+                        this.nameError = '';
+                    }
+                },
+                validatePhone() {
+                    if (!/^[0-9]+$/.test(this.phone)) {
+                        this.phoneError = 'Phone number must contain only numbers.';
+                    } else {
+                        this.phoneError = '';
+                    }
+                },
+                saveCart() {
+                    localStorage.setItem('cart', JSON.stringify(this.cart));
+                },
+                showNotification(message, type) {
+                    this.notificationMessage = message;
+                    this.notificationType = type;
+                    setTimeout(() => {
+                        this.notificationMessage = '';
+                        this.notificationType = '';
+                    }, 3000);
+                },
+            },
+            mounted() {
+                this.fetchLessons();
+            },
+        });
+    </script>
+</body>
+</html>

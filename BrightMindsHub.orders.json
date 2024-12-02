@@ -1,0 +1,45 @@
+[{
+  "_id": {
+    "$oid": "674b61a13dad32378f3c00ef"
+  },
+  "name": "Fred",
+  "phoneNumber": "57926422",
+  "lessonID": "5",
+  "NumberOfSpaces": "1"
+},
+{
+  "_id": {
+    "$oid": "674cc3f3614b2a1c1e1a6fce"
+  },
+  "name": "sakina",
+  "phone": "57824922",
+  "lessonIDs": [
+    "674b17d83dad32378f3c00e2"
+  ],
+  "numberOfSpaces": 1
+},
+{
+  "_id": {
+    "$oid": "674da073baa94a0d35985d35"
+  },
+  "name": "tom",
+  "phone": "12345678",
+  "lessonIDs": [
+    "674b5da23dad32378f3c00ec",
+    "674b5e143dad32378f3c00ed"
+  ],
+  "numberOfSpaces": 4
+},
+{
+  "_id": {
+    "$oid": "674da98dbaa94a0d35985d36"
+  },
+  "name": "sara",
+  "phone": "54632977",
+  "lessonIDs": [
+    "674b5da23dad32378f3c00ec",
+    "674b5e143dad32378f3c00ed",
+    "674b586a3dad32378f3c00eb"
+  ],
+  "numberOfSpaces": 9
+}]
